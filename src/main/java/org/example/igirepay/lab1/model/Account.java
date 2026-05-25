@@ -1,4 +1,4 @@
-package org.example.igirepay.model;
+package org.example.igirepay.lab1.model;
 
 import java.time.LocalDateTime;
 
@@ -21,7 +21,6 @@ public abstract class Account {
         this.locked = false;
     }
 
-    // PIN validation (bonus: locks after 3 failed attempts)
     public boolean validatePin(String inputPin) {
         if (locked) {
             System.out.println("Account is locked. Contact support.");
@@ -32,6 +31,7 @@ public abstract class Account {
             return true;
         } else {
             failedPinAttempts++;
+            System.out.println("Wrong PIN. Attempts: " + failedPinAttempts + "/3");
             if (failedPinAttempts >= 3) {
                 locked = true;
                 System.out.println("Account locked after 3 failed attempts.");

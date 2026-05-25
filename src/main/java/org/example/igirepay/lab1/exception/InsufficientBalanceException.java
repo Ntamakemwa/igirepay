@@ -1,8 +1,7 @@
-package org.example.igirepay.exception;
+package org.example.igirepay.lab1.exception;
 
 public class InsufficientBalanceException extends Exception {
     public InsufficientBalanceException(String message) {
         super(message);
     }
 }
-

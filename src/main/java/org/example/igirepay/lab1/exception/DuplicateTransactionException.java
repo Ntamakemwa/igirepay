@@ -1,4 +1,4 @@
-package org.example.igirepay.exception;
+package org.example.igirepay.lab1.exception;
 
 public class DuplicateTransactionException extends Exception {
     public DuplicateTransactionException(String message) {

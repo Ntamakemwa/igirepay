@@ -1,16 +1,14 @@
-package org.example.igirepay.model;
+package org.example.igirepay.lab1.model;
 
 import java.time.LocalDateTime;
 
 public class Transaction {
-
     private String transactionId;
     private String referenceId;
     private double amount;
-    private String transactionType; // DEPOSIT, WITHDRAWAL, TRANSFER
+    private String transactionType;
     private LocalDateTime timestamp;
 
-    // Constructor
     public Transaction(String transactionId, String referenceId,
                        double amount, String transactionType) {
         this.transactionId = transactionId;
@@ -20,19 +18,14 @@ public class Transaction {
         this.timestamp = LocalDateTime.now();
     }
 
-    // Getters and Setters
     public String getTransactionId() { return transactionId; }
     public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
-
     public String getReferenceId() { return referenceId; }
     public void setReferenceId(String referenceId) { this.referenceId = referenceId; }
-
     public double getAmount() { return amount; }
     public void setAmount(double amount) { this.amount = amount; }
-
     public String getTransactionType() { return transactionType; }
     public void setTransactionType(String transactionType) { this.transactionType = transactionType; }
-
     public LocalDateTime getTimestamp() { return timestamp; }
 
     @Override

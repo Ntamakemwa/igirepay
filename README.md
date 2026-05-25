@@ -23,4 +23,4 @@ Built with Java, JavaFX, JDBC, and PostgreSQL.
 
 ## Author
 
-Igire Rwanda / SheCanCode Backend Phase 1 Capstone.
+Olive Ntamakemwa / SheCanCode Backend Phase 1 Capstone.

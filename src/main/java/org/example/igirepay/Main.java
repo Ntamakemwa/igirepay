@@ -1,7 +1,15 @@
 package org.example.igirepay;
 
-import org.example.igirepay.lab1.model.*;
-import org.example.igirepay.lab1.exception.*;
+import org.example.igirepay.lab1.model.Account;
+import org.example.igirepay.lab1.model.Customer;
+import org.example.igirepay.lab1.model.FeeCalculator;
+import org.example.igirepay.lab1.model.Language;
+import org.example.igirepay.lab1.model.SavingsAccount;
+import org.example.igirepay.lab1.model.Transaction;
+import org.example.igirepay.lab1.model.WalletAccount;
+import org.example.igirepay.lab1.exception.DuplicateTransactionException;
+import org.example.igirepay.lab1.exception.InsufficientBalanceException;
+import org.example.igirepay.lab1.exception.InvalidAccountException;
 import java.util.Scanner;
 
 public class Main {

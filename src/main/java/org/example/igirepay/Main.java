@@ -10,6 +10,7 @@ import org.example.igirepay.lab2.dao.CustomerDAO;
 import org.example.igirepay.lab2.dao.ProcessedRequestDAO;
 import org.example.igirepay.lab2.dao.TransactionDAO;
 import org.example.igirepay.lab2.db.DatabaseConnection;
+import org.example.igirepay.lab3.reports.ReportGenerator;
 import java.sql.SQLException;
 import java.util.Scanner;
 import java.util.UUID;
@@ -21,6 +22,7 @@ public class Main {
     static AccountDAO accountDAO = new AccountDAO();
     static TransactionDAO transactionDAO = new TransactionDAO();
     static ProcessedRequestDAO processedRequestDAO = new ProcessedRequestDAO();
+    static ReportGenerator reportGenerator = new ReportGenerator();
 
     public static void main(String[] args) {
 
@@ -76,7 +78,6 @@ public class Main {
                 System.out.println(Language.get("mokash_activated") + "\n");
             }
 
-
         } else if (startChoice.equals("2")) {
             System.out.print(Language.get("phone_prompt"));
             String phone = scanner.nextLine().trim();
@@ -112,18 +113,18 @@ public class Main {
                 } else {
                     return;
                 }
-            }
+            } else {
+                double walletBalance = accountDAO.getBalance("W-" + phone);
+                String walletPin = accountDAO.getPin("W-" + phone);
+                wallet = new WalletAccount("W-" + phone, walletBalance, walletPin);
+                customer.addAccount(wallet);
 
-            double walletBalance = accountDAO.getBalance("W-" + phone);
-            String walletPin = accountDAO.getPin("W-" + phone);
-            wallet = new WalletAccount("W-" + phone, walletBalance, walletPin);
-            customer.addAccount(wallet);
-
-            if (accountDAO.accountExists("MK-" + phone)) {
-                double mokashBalance = accountDAO.getBalance("MK-" + phone);
-                String mokashPin = accountDAO.getPin("MK-" + phone);
-                mokash = new SavingsAccount("MK-" + phone, mokashBalance, mokashPin);
-                customer.addAccount(mokash);
+                if (accountDAO.accountExists("MK-" + phone)) {
+                    double mokashBalance = accountDAO.getBalance("MK-" + phone);
+                    String mokashPin = accountDAO.getPin("MK-" + phone);
+                    mokash = new SavingsAccount("MK-" + phone, mokashBalance, mokashPin);
+                    customer.addAccount(mokash);
+                }
             }
         } else {
             System.out.println(Language.get("invalid_option"));
@@ -173,6 +174,7 @@ public class Main {
                     transactionDAO.printFailedTransactions(wallet.getAccountId());
                     break;
                 case "8": selectLanguage(); break;
+                case "9": printReportsMenu(wallet, customer); break;
                 case "0":
                     System.out.println(Language.get("goodbye"));
                     DatabaseConnection.closeConnection();
@@ -207,7 +209,8 @@ public class Main {
                 case "4":
                     transactionDAO.printTransactionHistory(mokash.getAccountId());
                     break;
-                case "5": mokash.applyInterest();
+                case "5":
+                    mokash.applyInterest();
                     accountDAO.updateBalance(mokash.getAccountId(), mokash.getBalance());
                     break;
                 case "0": inMoKash = false; break;
@@ -226,8 +229,54 @@ public class Main {
         if (hasMoKash) System.out.println(Language.get("mokash_menu"));
         System.out.println(Language.get("failed_tx"));
         System.out.println(Language.get("change_lang"));
+        System.out.println("9. Reports");
         System.out.println(Language.get("exit"));
         System.out.print(Language.get("choose"));
+    }
+
+    static void printReportsMenu(WalletAccount wallet, Customer customer) {
+        boolean inReports = true;
+        while (inReports) {
+            System.out.println("\n========= REPORTS MENU =========");
+            System.out.println("1. Export Transaction History to CSV");
+            System.out.println("2. View Daily Summary");
+            System.out.println("3. Export Daily Summary to CSV");
+            System.out.println("4. View Customer Statement");
+            System.out.println("5. Search Transactions");
+            System.out.println("6. Filter by Status (SUCCESS/FAILED)");
+            System.out.println("0. Back");
+            System.out.print(Language.get("choose"));
+            String choice = scanner.nextLine().trim();
+            switch (choice) {
+                case "1":
+                    reportGenerator.exportTransactionHistoryToCSV(wallet.getAccountId());
+                    break;
+                case "2":
+                    reportGenerator.viewDailyTransactionSummary(wallet.getAccountId());
+                    break;
+                case "3":
+                    reportGenerator.exportDailySummaryToCSV(wallet.getAccountId());
+                    break;
+                case "4":
+                    reportGenerator.viewCustomerStatement(wallet.getAccountId(), customer.getFullName());
+                    break;
+                case "5":
+                    System.out.print("Search keyword: ");
+                    String keyword = scanner.nextLine().trim();
+                    reportGenerator.searchTransactions(wallet.getAccountId(), keyword);
+                    break;
+                case "6":
+                    System.out.print("Status (SUCCESS/FAILED): ");
+                    String status = scanner.nextLine().trim();
+                    reportGenerator.filterByStatus(wallet.getAccountId(), status);
+                    break;
+                case "0":
+                    inReports = false;
+                    break;
+                default:
+                    System.out.println(Language.get("invalid_option"));
+            }
+        }
     }
 
     static void selectLanguage() {
@@ -295,10 +344,10 @@ public class Main {
             processedRequestDAO.saveProcessedRequest(refId);
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            String refId = "DEP-ERR-" + UUID.randomUUID();
             transactionDAO.createTransaction(
                     "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    refId, "DEPOSIT", 0, 0, "FAILED", e.getMessage()
+                    "DEP-ERR-" + UUID.randomUUID(), "DEPOSIT",
+                    0, 0, "FAILED", e.getMessage()
             );
         }
     }
@@ -349,7 +398,6 @@ public class Main {
             );
         }
     }
-
 
     static void handleSendLocal(WalletAccount wallet, Customer customer) {
         System.out.print(Language.get("enter_pin"));
@@ -413,7 +461,6 @@ public class Main {
             );
         }
     }
-
 
     static void handleSendInternational(WalletAccount wallet, Customer customer) {
         System.out.print(Language.get("enter_pin"));
@@ -494,10 +541,10 @@ public class Main {
                 String reason = "Insufficient wallet balance. Have: " +
                         wallet.getBalance() + " RWF, Need: " + amount + " RWF";
                 System.out.println("✗ " + reason);
-                String refId = "MKD-ERR-" + UUID.randomUUID();
                 transactionDAO.createTransaction(
                         "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                        refId, "MOKASH_DEPOSIT", amount, 0, "FAILED", reason
+                        "MKD-ERR-" + UUID.randomUUID(), "MOKASH_DEPOSIT",
+                        amount, 0, "FAILED", reason
                 );
                 return;
             }
@@ -523,10 +570,10 @@ public class Main {
             System.out.println("✓ MoKash: " + mokash.getBalance() + " RWF");
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            String refId = "MKD-ERR-" + UUID.randomUUID();
             transactionDAO.createTransaction(
                     "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                    refId, "MOKASH_DEPOSIT", 0, 0, "FAILED", e.getMessage()
+                    "MKD-ERR-" + UUID.randomUUID(), "MOKASH_DEPOSIT",
+                    0, 0, "FAILED", e.getMessage()
             );
         }
     }
@@ -559,10 +606,10 @@ public class Main {
             System.out.println("✓ Wallet: " + wallet.getBalance() + " RWF");
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            String refId = "MKW-ERR-" + UUID.randomUUID();
             transactionDAO.createTransaction(
                     "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                    refId, "MOKASH_WITHDRAWAL", 0, 0, "FAILED", e.getMessage()
+                    "MKW-ERR-" + UUID.randomUUID(), "MOKASH_WITHDRAWAL",
+                    0, 0, "FAILED", e.getMessage()
             );
         }
     }

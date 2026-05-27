@@ -10,4 +10,5 @@ module org.example.igirepay {
     exports org.example.igirepay.lab2.db;
     exports org.example.igirepay.lab2.dao;
     exports org.example.igirepay.lab3.service;
+    exports org.example.igirepay.lab3.reports;
 }

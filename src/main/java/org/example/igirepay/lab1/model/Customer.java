@@ -30,6 +30,18 @@ public class Customer {
         return phone.matches("^(078|079)\\d{7}$");
     }
 
+    public static boolean isValidInternationalNumber(String phone) {
+        // Support country codes: +1 (US/Canada), +44 (UK), +33 (France), +49 (Germany), 
+        // +39 (Italy), +34 (Spain), +32 (Belgium), +31 (Netherlands), +41 (Switzerland),
+        // +43 (Austria), +45 (Denmark), +46 (Sweden), +47 (Norway), +48 (Poland),
+        // +91 (India), +81 (Japan), +86 (China), +234 (Nigeria), +27 (South Africa)
+        return phone.matches("^\\+(?:1|44|33|49|39|34|32|31|41|43|45|46|47|48|91|81|86|234|27)\\d{9,14}$");
+    }
+
+    public static boolean isLocalNumber(String phone) {
+        return phone.matches("^(078|079)\\d{7}$");
+    }
+
     public static boolean isValidPin(String pin) {
         return pin.matches("^\\d{5}$");
     }

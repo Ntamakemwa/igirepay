@@ -10,8 +10,9 @@ import org.example.igirepay.lab2.dao.CustomerDAO;
 import org.example.igirepay.lab2.dao.ProcessedRequestDAO;
 import org.example.igirepay.lab2.dao.TransactionDAO;
 import org.example.igirepay.lab2.db.DatabaseConnection;
+import org.example.igirepay.lab3.auth.PinHasher;
 import org.example.igirepay.lab3.reports.ReportGenerator;
-import java.sql.SQLException;
+
 import java.util.Scanner;
 import java.util.UUID;
 
@@ -26,9 +27,7 @@ public class Main {
 
     public static void main(String[] args) {
 
-        try {
-            DatabaseConnection.getConnection();
-        } catch (SQLException e) {
+        if (!DatabaseConnection.testConnection()) {
             System.out.println("✗ Cannot connect to database. Exiting.");
             return;
         }
@@ -53,28 +52,21 @@ public class Main {
             if (customer == null) return;
 
             String walletPin = getPin(Language.get("create_pin"));
-            wallet = new WalletAccount("W-" + customer.getPhoneNumber(), 0, walletPin);
+            String hashedWalletPin = PinHasher.hash(walletPin);
+            wallet = new WalletAccount("W-" + customer.getPhoneNumber(), 0, hashedWalletPin);
             customer.addAccount(wallet);
-
             customerDAO.createCustomer(customer);
-            accountDAO.createAccount(
-                    wallet.getAccountId(),
-                    customer.getCustomerId(),
-                    "WALLET", 0, walletPin
-            );
+            accountDAO.createAccount(wallet.getAccountId(), customer.getCustomerId(), "WALLET", 0, hashedWalletPin);
             System.out.println(Language.get("wallet_created") + "\n");
 
             System.out.print(Language.get("mokash_ask"));
             String moKashChoice = scanner.nextLine().trim().toLowerCase();
             if (moKashChoice.equals("yes") || moKashChoice.equals("yego")) {
                 String mokashPin = getPin(Language.get("mokash_pin"));
-                mokash = new SavingsAccount("MK-" + customer.getPhoneNumber(), 0, mokashPin);
+                String hashedMokashPin = PinHasher.hash(mokashPin);
+                mokash = new SavingsAccount("MK-" + customer.getPhoneNumber(), 0, hashedMokashPin);
                 customer.addAccount(mokash);
-                accountDAO.createAccount(
-                        mokash.getAccountId(),
-                        customer.getCustomerId(),
-                        "MOKASH", 0, mokashPin
-                );
+                accountDAO.createAccount(mokash.getAccountId(), customer.getCustomerId(), "MOKASH", 0, hashedMokashPin);
                 System.out.println(Language.get("mokash_activated") + "\n");
             }
 
@@ -96,18 +88,20 @@ public class Main {
                     customer = registerCustomer();
                     if (customer == null) return;
                     String walletPin = getPin(Language.get("create_pin"));
-                    wallet = new WalletAccount("W-" + customer.getPhoneNumber(), 0, walletPin);
+                    String hashedWalletPin = PinHasher.hash(walletPin);
+                    wallet = new WalletAccount("W-" + customer.getPhoneNumber(), 0, hashedWalletPin);
                     customer.addAccount(wallet);
                     customerDAO.createCustomer(customer);
-                    accountDAO.createAccount(wallet.getAccountId(), customer.getCustomerId(), "WALLET", 0, walletPin);
+                    accountDAO.createAccount(wallet.getAccountId(), customer.getCustomerId(), "WALLET", 0, hashedWalletPin);
                     System.out.println(Language.get("wallet_created") + "\n");
                     System.out.print(Language.get("mokash_ask"));
                     String moKashChoice = scanner.nextLine().trim().toLowerCase();
                     if (moKashChoice.equals("yes") || moKashChoice.equals("yego")) {
                         String mokashPin = getPin(Language.get("mokash_pin"));
-                        mokash = new SavingsAccount("MK-" + customer.getPhoneNumber(), 0, mokashPin);
+                        String hashedMokashPin = PinHasher.hash(mokashPin);
+                        mokash = new SavingsAccount("MK-" + customer.getPhoneNumber(), 0, hashedMokashPin);
                         customer.addAccount(mokash);
-                        accountDAO.createAccount(mokash.getAccountId(), customer.getCustomerId(), "MOKASH", 0, mokashPin);
+                        accountDAO.createAccount(mokash.getAccountId(), customer.getCustomerId(), "MOKASH", 0, hashedMokashPin);
                         System.out.println(Language.get("mokash_activated") + "\n");
                     }
                 } else {
@@ -118,7 +112,6 @@ public class Main {
                 String walletPin = accountDAO.getPin("W-" + phone);
                 wallet = new WalletAccount("W-" + phone, walletBalance, walletPin);
                 customer.addAccount(wallet);
-
                 if (accountDAO.accountExists("MK-" + phone)) {
                     double mokashBalance = accountDAO.getBalance("MK-" + phone);
                     String mokashPin = accountDAO.getPin("MK-" + phone);
@@ -163,25 +156,20 @@ public class Main {
                 case "3": handleSendLocal(wallet, customer); break;
                 case "4": handleSendInternational(wallet, customer); break;
                 case "5":
-                    double bal = accountDAO.getBalance(wallet.getAccountId());
-                    System.out.println("\n💰 Wallet: " + bal + " RWF");
+                    System.out.println("\n💰 Wallet: " + accountDAO.getBalance(wallet.getAccountId()) + " RWF");
                     break;
                 case "6":
                     if (mokash != null) mokashMenu(mokash, wallet, customer);
                     else System.out.println(Language.get("mokash_not_active"));
                     break;
-                case "7":
-                    transactionDAO.printFailedTransactions(wallet.getAccountId());
-                    break;
+                case "7": transactionDAO.printFailedTransactions(wallet.getAccountId()); break;
                 case "8": selectLanguage(); break;
                 case "9": printReportsMenu(wallet, customer); break;
                 case "0":
                     System.out.println(Language.get("goodbye"));
-                    DatabaseConnection.closeConnection();
                     running = false;
                     break;
-                default:
-                    System.out.println(Language.get("invalid_option"));
+                default: System.out.println(Language.get("invalid_option"));
             }
         }
     }
@@ -197,18 +185,14 @@ public class Main {
             System.out.println(Language.get("mokash_interest"));
             System.out.println(Language.get("back"));
             System.out.print(Language.get("choose"));
-
             String choice = scanner.nextLine().trim();
             switch (choice) {
                 case "1": handleMoKashDeposit(wallet, mokash, customer); break;
                 case "2": handleMoKashWithdraw(mokash, wallet, customer); break;
                 case "3":
-                    double bal = accountDAO.getBalance(mokash.getAccountId());
-                    System.out.println("\n💰 MoKash: " + bal + " RWF");
+                    System.out.println("\n💰 MoKash: " + accountDAO.getBalance(mokash.getAccountId()) + " RWF");
                     break;
-                case "4":
-                    transactionDAO.printTransactionHistory(mokash.getAccountId());
-                    break;
+                case "4": transactionDAO.printTransactionHistory(mokash.getAccountId()); break;
                 case "5":
                     mokash.applyInterest();
                     accountDAO.updateBalance(mokash.getAccountId(), mokash.getBalance());
@@ -248,33 +232,20 @@ public class Main {
             System.out.print(Language.get("choose"));
             String choice = scanner.nextLine().trim();
             switch (choice) {
-                case "1":
-                    reportGenerator.exportTransactionHistoryToCSV(wallet.getAccountId());
-                    break;
-                case "2":
-                    reportGenerator.viewDailyTransactionSummary(wallet.getAccountId());
-                    break;
-                case "3":
-                    reportGenerator.exportDailySummaryToCSV(wallet.getAccountId());
-                    break;
-                case "4":
-                    reportGenerator.viewCustomerStatement(wallet.getAccountId(), customer.getFullName());
-                    break;
+                case "1": reportGenerator.exportTransactionHistoryToCSV(wallet.getAccountId()); break;
+                case "2": reportGenerator.viewDailyTransactionSummary(wallet.getAccountId()); break;
+                case "3": reportGenerator.exportDailySummaryToCSV(wallet.getAccountId()); break;
+                case "4": reportGenerator.viewCustomerStatement(wallet.getAccountId(), customer.getFullName()); break;
                 case "5":
                     System.out.print("Search keyword: ");
-                    String keyword = scanner.nextLine().trim();
-                    reportGenerator.searchTransactions(wallet.getAccountId(), keyword);
+                    reportGenerator.searchTransactions(wallet.getAccountId(), scanner.nextLine().trim());
                     break;
                 case "6":
                     System.out.print("Status (SUCCESS/FAILED): ");
-                    String status = scanner.nextLine().trim();
-                    reportGenerator.filterByStatus(wallet.getAccountId(), status);
+                    reportGenerator.filterByStatus(wallet.getAccountId(), scanner.nextLine().trim());
                     break;
-                case "0":
-                    inReports = false;
-                    break;
-                default:
-                    System.out.println(Language.get("invalid_option"));
+                case "0": inReports = false; break;
+                default: System.out.println(Language.get("invalid_option"));
             }
         }
     }
@@ -284,8 +255,7 @@ public class Main {
         System.out.println(Language.get("lang_en"));
         System.out.println(Language.get("lang_rw"));
         System.out.print(Language.get("choose"));
-        String choice = scanner.nextLine().trim();
-        if (choice.equals("2")) {
+        if (scanner.nextLine().trim().equals("2")) {
             Language.setLanguage(Language.Lang.RW);
             System.out.println("✓ Ururimi rwahinduwe: Kinyarwanda");
         } else {
@@ -302,14 +272,8 @@ public class Main {
         while (true) {
             System.out.print(Language.get("phone_prompt"));
             phone = scanner.nextLine().trim();
-            if (!Customer.isValidPhoneNumber(phone)) {
-                System.out.println(Language.get("invalid_phone"));
-                continue;
-            }
-            if (customerDAO.customerExists(phone)) {
-                System.out.println("✗ Account already exists. Please login.");
-                return null;
-            }
+            if (!Customer.isValidPhoneNumber(phone)) { System.out.println(Language.get("invalid_phone")); continue; }
+            if (customerDAO.customerExists(phone)) { System.out.println("✗ Account already exists. Please login."); return null; }
             break;
         }
         return new Customer("C-" + phone, name, phone);
@@ -330,25 +294,14 @@ public class Main {
             double amount = Double.parseDouble(scanner.nextLine().trim());
             if (amount <= 0) throw new IllegalArgumentException("Amount must be greater than 0.");
             String refId = "DEP-" + UUID.randomUUID();
-            if (processedRequestDAO.isAlreadyProcessed(refId)) {
-                System.out.println("✗ Duplicate transaction detected.");
-                return;
-            }
+            if (processedRequestDAO.isAlreadyProcessed(refId)) { System.out.println("✗ Duplicate transaction."); return; }
             wallet.deposit(amount);
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    refId, "DEPOSIT", amount, 0, "SUCCESS",
-                    "Deposit to wallet"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), refId, "DEPOSIT", amount, 0, "SUCCESS", "Deposit to wallet");
             processedRequestDAO.saveProcessedRequest(refId);
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "DEP-ERR-" + UUID.randomUUID(), "DEPOSIT",
-                    0, 0, "FAILED", e.getMessage()
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "DEP-ERR-" + UUID.randomUUID(), "DEPOSIT", 0, 0, "FAILED", e.getMessage());
         }
     }
 
@@ -357,11 +310,7 @@ public class Main {
         String pin = scanner.nextLine().trim();
         if (!wallet.validatePin(pin)) {
             System.out.println("✗ Incorrect PIN. Transaction cancelled.");
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "WIT-ERR-" + UUID.randomUUID(), "WITHDRAWAL",
-                    0, 0, "FAILED", "Wrong PIN entered"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "WIT-ERR-" + UUID.randomUUID(), "WITHDRAWAL", 0, 0, "FAILED", "Wrong PIN");
             return;
         }
         System.out.print(Language.get("enter_amount"));
@@ -372,30 +321,16 @@ public class Main {
             System.out.println(Language.get("fee_info") + fee + Language.get("total_info") + (amount + fee) + " RWF");
             System.out.print(Language.get("confirm"));
             String confirm = scanner.nextLine().trim().toLowerCase();
-            if (!confirm.equals("yes") && !confirm.equals("yego")) {
-                System.out.println(Language.get("cancelled"));
-                return;
-            }
+            if (!confirm.equals("yes") && !confirm.equals("yego")) { System.out.println(Language.get("cancelled")); return; }
             String refId = "WIT-" + UUID.randomUUID();
-            if (processedRequestDAO.isAlreadyProcessed(refId)) {
-                System.out.println("✗ Duplicate transaction detected.");
-                return;
-            }
+            if (processedRequestDAO.isAlreadyProcessed(refId)) { System.out.println("✗ Duplicate transaction."); return; }
             wallet.withdraw(amount);
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    refId, "WITHDRAWAL", amount, fee, "SUCCESS",
-                    "Wallet withdrawal"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), refId, "WITHDRAWAL", amount, fee, "SUCCESS", "Wallet withdrawal");
             processedRequestDAO.saveProcessedRequest(refId);
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "WIT-ERR-" + UUID.randomUUID(), "WITHDRAWAL",
-                    0, 0, "FAILED", e.getMessage()
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "WIT-ERR-" + UUID.randomUUID(), "WITHDRAWAL", 0, 0, "FAILED", e.getMessage());
         }
     }
 
@@ -404,61 +339,41 @@ public class Main {
         String pin = scanner.nextLine().trim();
         if (!wallet.validatePin(pin)) {
             System.out.println("✗ Incorrect PIN. Transaction cancelled.");
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
-                    0, 0, "FAILED", "Wrong PIN entered"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL", 0, 0, "FAILED", "Wrong PIN");
             return;
         }
         System.out.print(Language.get("recipient"));
         String recipient = scanner.nextLine().trim();
         if (!Customer.isValidPhoneNumber(recipient)) {
             System.out.println(Language.get("invalid_recipient"));
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
-                    0, 0, "FAILED", "Invalid recipient: " + recipient
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL", 0, 0, "FAILED", "Invalid recipient: " + recipient);
             return;
         }
+        // Show recipient name and current wallet balance
+        CustomerDAO recipientDAO = new CustomerDAO();
+        Customer recLocal = recipientDAO.getCustomerByPhone(recipient);
+        String recipientNameLocal = (recLocal != null) ? recLocal.getFullName() : recipient;
+        System.out.println("Recipient: " + recipientNameLocal + " (" + recipient + ")");
+        System.out.println("Your Wallet balance: " + accountDAO.getBalance(wallet.getAccountId()) + " RWF");
         System.out.print(Language.get("enter_amount"));
         try {
             double amount = Double.parseDouble(scanner.nextLine().trim());
             if (amount <= 0) throw new IllegalArgumentException("Amount must be greater than 0.");
             boolean isOnNet = recipient.startsWith("078") || recipient.startsWith("079");
-            double fee = isOnNet ?
-                    FeeCalculator.getSendOnNetFee(amount) :
-                    FeeCalculator.getSendOffNetFee(amount);
-            System.out.println(Language.get("fee_info") + fee +
-                    Language.get("total_info") + (amount + fee) + " RWF (" +
-                    (isOnNet ? "On-net" : "Off-net") + ")");
+            double fee = isOnNet ? FeeCalculator.getSendOnNetFee(amount) : FeeCalculator.getSendOffNetFee(amount);
+            System.out.println(Language.get("fee_info") + fee + Language.get("total_info") + (amount + fee) + " RWF (" + (isOnNet ? "On-net" : "Off-net") + ")");
             System.out.print(Language.get("confirm"));
             String confirm = scanner.nextLine().trim().toLowerCase();
-            if (!confirm.equals("yes") && !confirm.equals("yego")) {
-                System.out.println(Language.get("cancelled"));
-                return;
-            }
+            if (!confirm.equals("yes") && !confirm.equals("yego")) { System.out.println(Language.get("cancelled")); return; }
             String refId = "SND-" + UUID.randomUUID();
-            if (processedRequestDAO.isAlreadyProcessed(refId)) {
-                System.out.println("✗ Duplicate transaction detected.");
-                return;
-            }
+            if (processedRequestDAO.isAlreadyProcessed(refId)) { System.out.println("✗ Duplicate transaction."); return; }
             wallet.sendMoneyLocal(amount, recipient);
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    refId, "SEND_LOCAL", amount, fee, "SUCCESS",
-                    "Sent to " + recipient
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), refId, "SEND_LOCAL", amount, fee, "SUCCESS", "Sent to " + recipient);
             processedRequestDAO.saveProcessedRequest(refId);
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
-                    0, 0, "FAILED", e.getMessage()
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL", 0, 0, "FAILED", e.getMessage());
         }
     }
 
@@ -467,67 +382,47 @@ public class Main {
         String pin = scanner.nextLine().trim();
         if (!wallet.validatePin(pin)) {
             System.out.println("✗ Incorrect PIN. Transaction cancelled.");
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "INT-ERR-" + UUID.randomUUID(), "SEND_INTL",
-                    0, 0, "FAILED", "Wrong PIN entered"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "INT-ERR-" + UUID.randomUUID(), "SEND_INTL", 0, 0, "FAILED", "Wrong PIN");
             return;
         }
         System.out.println("\n=== Supported Countries ===");
-        FeeCalculator.SUPPORTED_COUNTRIES.forEach((code, name) ->
-                System.out.println("  +" + code + " → " + name));
+        FeeCalculator.SUPPORTED_COUNTRIES.forEach((code, name) -> System.out.println("  +" + code + " → " + name));
         System.out.println("===========================");
         System.out.print(Language.get("country_code"));
         String countryCode = scanner.nextLine().trim();
         if (!FeeCalculator.isSupportedCountry(countryCode)) {
             String reason = "Unsupported country code: +" + countryCode;
             System.out.println("✗ " + reason);
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "INT-ERR-" + UUID.randomUUID(), "SEND_INTL",
-                    0, 0, "FAILED", reason
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "INT-ERR-" + UUID.randomUUID(), "SEND_INTL", 0, 0, "FAILED", reason);
             return;
         }
         System.out.println("✓ Sending to: " + FeeCalculator.getCountryName(countryCode));
         System.out.print(Language.get("recipient_number"));
         String recipient = scanner.nextLine().trim();
+        // Show recipient name (if exists) and current wallet balance
+        CustomerDAO recipientDAO = new CustomerDAO();
+        Customer recIntl = recipientDAO.getCustomerByPhone(recipient);
+        String recipientNameIntl = (recIntl != null) ? recIntl.getFullName() : recipient;
+        System.out.println("Recipient: " + recipientNameIntl + " (" + recipient + ")");
+        System.out.println("Your Wallet balance: " + accountDAO.getBalance(wallet.getAccountId()) + " RWF");
         System.out.print(Language.get("enter_amount"));
         try {
             double amount = Double.parseDouble(scanner.nextLine().trim());
             if (amount <= 0) throw new IllegalArgumentException("Amount must be greater than 0.");
             double fee = FeeCalculator.getInternationalFee(amount);
-            System.out.println(Language.get("fee_info") + fee +
-                    Language.get("total_info") + (amount + fee) + " RWF");
-            System.out.println("  Destination: +" + countryCode + " " + recipient +
-                    " (" + FeeCalculator.getCountryName(countryCode) + ")");
+            System.out.println(Language.get("fee_info") + fee + Language.get("total_info") + (amount + fee) + " RWF");
             System.out.print(Language.get("confirm"));
             String confirm = scanner.nextLine().trim().toLowerCase();
-            if (!confirm.equals("yes") && !confirm.equals("yego")) {
-                System.out.println(Language.get("cancelled"));
-                return;
-            }
+            if (!confirm.equals("yes") && !confirm.equals("yego")) { System.out.println(Language.get("cancelled")); return; }
             String refId = "INT-" + UUID.randomUUID();
-            if (processedRequestDAO.isAlreadyProcessed(refId)) {
-                System.out.println("✗ Duplicate transaction detected.");
-                return;
-            }
+            if (processedRequestDAO.isAlreadyProcessed(refId)) { System.out.println("✗ Duplicate transaction."); return; }
             wallet.sendMoneyInternational(amount, countryCode, recipient);
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    refId, "SEND_INTL", amount, fee, "SUCCESS",
-                    "Sent to +" + countryCode + " " + recipient
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), refId, "SEND_INTL", amount, fee, "SUCCESS", "Sent to +" + countryCode + " " + recipient);
             processedRequestDAO.saveProcessedRequest(refId);
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                    "INT-ERR-" + UUID.randomUUID(), "SEND_INTL",
-                    0, 0, "FAILED", e.getMessage()
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "INT-ERR-" + UUID.randomUUID(), "SEND_INTL", 0, 0, "FAILED", e.getMessage());
         }
     }
 
@@ -538,43 +433,27 @@ public class Main {
             double amount = Double.parseDouble(scanner.nextLine().trim());
             if (amount <= 0) throw new IllegalArgumentException("Amount must be greater than 0.");
             if (amount > wallet.getBalance()) {
-                String reason = "Insufficient wallet balance. Have: " +
-                        wallet.getBalance() + " RWF, Need: " + amount + " RWF";
+                String reason = "Insufficient wallet balance. Have: " + wallet.getBalance() + " RWF, Need: " + amount + " RWF";
                 System.out.println("✗ " + reason);
-                transactionDAO.createTransaction(
-                        "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                        "MKD-ERR-" + UUID.randomUUID(), "MOKASH_DEPOSIT",
-                        amount, 0, "FAILED", reason
-                );
+                transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), mokash.getAccountId(), "MKD-ERR-" + UUID.randomUUID(), "MOKASH_DEPOSIT", amount, 0, "FAILED", reason);
                 return;
             }
             System.out.println("Fee: 0 RWF | Amount: " + amount + " RWF");
             System.out.print(Language.get("confirm"));
             String confirm = scanner.nextLine().trim().toLowerCase();
-            if (!confirm.equals("yes") && !confirm.equals("yego")) {
-                System.out.println(Language.get("cancelled"));
-                return;
-            }
+            if (!confirm.equals("yes") && !confirm.equals("yego")) { System.out.println(Language.get("cancelled")); return; }
             String refId = "MKD-" + UUID.randomUUID();
             wallet.setBalance(wallet.getBalance() - amount);
             mokash.deposit(amount);
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
             accountDAO.updateBalance(mokash.getAccountId(), mokash.getBalance());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                    refId, "MOKASH_DEPOSIT", amount, 0, "SUCCESS",
-                    "Deposit from wallet to MoKash"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), mokash.getAccountId(), refId, "MOKASH_DEPOSIT", amount, 0, "SUCCESS", "Deposit from wallet to MoKash");
             processedRequestDAO.saveProcessedRequest(refId);
             System.out.println("✓ Wallet: " + wallet.getBalance() + " RWF");
             System.out.println("✓ MoKash: " + mokash.getBalance() + " RWF");
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                    "MKD-ERR-" + UUID.randomUUID(), "MOKASH_DEPOSIT",
-                    0, 0, "FAILED", e.getMessage()
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), mokash.getAccountId(), "MKD-ERR-" + UUID.randomUUID(), "MOKASH_DEPOSIT", 0, 0, "FAILED", e.getMessage());
         }
     }
 
@@ -587,30 +466,19 @@ public class Main {
             System.out.println("Fee: 0 RWF | Amount: " + amount + " RWF");
             System.out.print(Language.get("confirm"));
             String confirm = scanner.nextLine().trim().toLowerCase();
-            if (!confirm.equals("yes") && !confirm.equals("yego")) {
-                System.out.println(Language.get("cancelled"));
-                return;
-            }
+            if (!confirm.equals("yes") && !confirm.equals("yego")) { System.out.println(Language.get("cancelled")); return; }
             String refId = "MKW-" + UUID.randomUUID();
             mokash.withdraw(amount);
             wallet.setBalance(wallet.getBalance() + amount);
             accountDAO.updateBalance(mokash.getAccountId(), mokash.getBalance());
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                    refId, "MOKASH_WITHDRAWAL", amount, 0, "SUCCESS",
-                    "Withdrawal from MoKash to wallet"
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), mokash.getAccountId(), refId, "MOKASH_WITHDRAWAL", amount, 0, "SUCCESS", "Withdrawal from MoKash to wallet");
             processedRequestDAO.saveProcessedRequest(refId);
             System.out.println("✓ MoKash: " + mokash.getBalance() + " RWF");
             System.out.println("✓ Wallet: " + wallet.getBalance() + " RWF");
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction(
-                    "TXN-" + UUID.randomUUID(), mokash.getAccountId(),
-                    "MKW-ERR-" + UUID.randomUUID(), "MOKASH_WITHDRAWAL",
-                    0, 0, "FAILED", e.getMessage()
-            );
+            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), mokash.getAccountId(), "MKW-ERR-" + UUID.randomUUID(), "MOKASH_WITHDRAWAL", 0, 0, "FAILED", e.getMessage());
         }
     }
 }

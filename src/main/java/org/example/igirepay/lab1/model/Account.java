@@ -1,6 +1,9 @@
 package org.example.igirepay.lab1.model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import org.example.igirepay.lab3.auth.PinHasher;
 
 public abstract class Account {
     private String accountId;
@@ -11,6 +14,8 @@ public abstract class Account {
     private int failedPinAttempts;
     private boolean locked;
 
+    protected List<String> transactionHistory;
+
     public Account(String accountId, String accountType, double balance, String pin) {
         this.accountId = accountId;
         this.accountType = accountType;
@@ -19,35 +24,34 @@ public abstract class Account {
         this.createdAt = LocalDateTime.now();
         this.failedPinAttempts = 0;
         this.locked = false;
+        this.transactionHistory = new ArrayList<>();
     }
 
     public boolean validatePin(String inputPin) {
-        if (locked) {
-            System.out.println("Account is locked. Contact support.");
-            return false;
-        }
-        if (this.pin.equals(inputPin)) {
+        if (locked) return false;
+        boolean valid = PinHasher.isHashed(inputPin)
+                ? inputPin.equals(this.pin)
+                : PinHasher.verify(inputPin, this.pin);
+        if (valid) {
             failedPinAttempts = 0;
             return true;
         } else {
             failedPinAttempts++;
-            System.out.println("Wrong PIN. Attempts: " + failedPinAttempts + "/3");
-            if (failedPinAttempts >= 3) {
-                locked = true;
-                System.out.println("Account locked after 3 failed attempts.");
-            }
+            if (failedPinAttempts >= 3) locked = true;
             return false;
         }
     }
 
     public void changePin(String oldPin, String newPin) {
         if (validatePin(oldPin)) {
-            this.pin = newPin;
+            this.pin = PinHasher.hash(newPin);
             System.out.println("PIN changed successfully.");
         } else {
             System.out.println("Incorrect PIN. Cannot change.");
         }
     }
+
+    public List<String> getTransactionHistory() { return transactionHistory; }
 
     public abstract void deposit(double amount);
     public abstract void withdraw(double amount) throws Exception;
@@ -61,7 +65,9 @@ public abstract class Account {
     public void setBalance(double balance) { this.balance = balance; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public boolean isLocked() { return locked; }
+    public void setLocked(boolean locked) { this.locked = locked; }
     public int getFailedPinAttempts() { return failedPinAttempts; }
+    public void setFailedPinAttempts(int failedPinAttempts) { this.failedPinAttempts = failedPinAttempts; }
 
     @Override
     public String toString() {

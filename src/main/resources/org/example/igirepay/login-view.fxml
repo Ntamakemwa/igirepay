@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.example.igirepay.lab3.ui.javafx.LoginController"
+      alignment="CENTER"
+      style="-fx-background-color: #1a1f36;">
+
+    <HBox alignment="CENTER" VBox.vgrow="ALWAYS">
+
+        <VBox alignment="CENTER" spacing="20" prefWidth="420"
+              style="-fx-background-color: #1a1f36; -fx-padding: 60;">
+            <Label text="IgirePay"
+                   style="-fx-font-size: 36; -fx-font-weight: bold; -fx-text-fill: #ffd700;"/>
+            <Label text="Digital Wallet System"
+                   style="-fx-font-size: 14; -fx-text-fill: #8892b0;"/>
+            <Label text="Secure. Fast. Reliable."
+                   style="-fx-font-size: 12; -fx-text-fill: #8892b0;"/>
+            <ComboBox fx:id="languageCombo" prefWidth="180"
+                      style="-fx-background-radius: 8;"/>
+        </VBox>
+
+        <VBox alignment="CENTER" spacing="16" prefWidth="480" prefHeight="620"
+              style="-fx-background-color: #ffffff; -fx-padding: 50; -fx-background-radius: 16;">
+
+            <Label fx:id="titleLabel" text="Welcome to IgirePay"
+                   style="-fx-font-size: 24; -fx-font-weight: bold; -fx-text-fill: #1a1f36;"/>
+
+            <VBox fx:id="nameBox" spacing="6" maxWidth="340">
+                <Label fx:id="nameLabel" text="Full Name"
+                       style="-fx-font-size: 12; -fx-text-fill: #1a1f36; -fx-font-weight: bold;"/>
+                <TextField fx:id="nameField" promptText="Enter your full name"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8;
+                                  -fx-border-color: #e0e0e0; -fx-padding: 12; -fx-font-size: 14;"/>
+            </VBox>
+
+            <VBox spacing="6" maxWidth="340">
+                <Label fx:id="phoneLabel" text="Phone Number"
+                       style="-fx-font-size: 12; -fx-text-fill: #1a1f36; -fx-font-weight: bold;"/>
+                <TextField fx:id="phoneField" promptText="078XXXXXXX"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8;
+                                  -fx-border-color: #e0e0e0; -fx-padding: 12; -fx-font-size: 14;"/>
+            </VBox>
+
+            <VBox spacing="6" maxWidth="340">
+                <Label fx:id="pinLabel" text="PIN"
+                       style="-fx-font-size: 12; -fx-text-fill: #1a1f36; -fx-font-weight: bold;"/>
+                <PasswordField fx:id="pinField" promptText="Enter 5-digit PIN"
+                               style="-fx-background-radius: 8; -fx-border-radius: 8;
+                                      -fx-border-color: #e0e0e0; -fx-padding: 12; -fx-font-size: 14;"/>
+            </VBox>
+
+            <Label fx:id="errorLabel" text=""
+                   style="-fx-text-fill: #e74c3c; -fx-font-size: 12;" wrapText="true" maxWidth="340"/>
+
+            <Button fx:id="loginButton" text="Login" onAction="#handleLogin"
+                    prefWidth="340" prefHeight="48"
+                    style="-fx-background-color: #ffd700; -fx-text-fill: #1a1f36;
+                           -fx-font-weight: bold; -fx-font-size: 15;
+                           -fx-background-radius: 8; -fx-cursor: hand;"/>
+
+            <Button fx:id="registerButton" text="Create Account" onAction="#handleRegister"
+                    prefWidth="340" prefHeight="48"
+                    style="-fx-background-color: #1a1f36; -fx-text-fill: #ffffff;
+                           -fx-font-weight: bold; -fx-font-size: 15;
+                           -fx-background-radius: 8; -fx-cursor: hand;"/>
+
+            <Button fx:id="switchButton" text="Already have an account? Login"
+                    onAction="#handleSwitch"
+                    prefWidth="340" prefHeight="36"
+                    style="-fx-background-color: transparent; -fx-text-fill: #3498db;
+                           -fx-font-size: 12; -fx-cursor: hand; -fx-border-color: transparent;"/>
+        </VBox>
+    </HBox>
+</VBox>

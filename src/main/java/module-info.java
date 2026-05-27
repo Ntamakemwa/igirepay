@@ -9,4 +9,5 @@ module org.example.igirepay {
     exports org.example.igirepay.lab1.exception;
     exports org.example.igirepay.lab2.db;
     exports org.example.igirepay.lab2.dao;
+    exports org.example.igirepay.lab3.service;
 }

@@ -339,41 +339,101 @@ public class Main {
         String pin = scanner.nextLine().trim();
         if (!wallet.validatePin(pin)) {
             System.out.println("✗ Incorrect PIN. Transaction cancelled.");
-            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL", 0, 0, "FAILED", "Wrong PIN");
+            transactionDAO.createTransaction(
+                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
+                    "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
+                    0, 0, "FAILED", "Wrong PIN");
             return;
         }
+
         System.out.print(Language.get("recipient"));
         String recipient = scanner.nextLine().trim();
+
+
         if (!Customer.isValidPhoneNumber(recipient)) {
-            System.out.println(Language.get("invalid_recipient"));
-            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL", 0, 0, "FAILED", "Invalid recipient: " + recipient);
+            System.out.println("✗ Invalid number. Must be 078/079 (MTN) or 072/073 (Airtel).");
+            transactionDAO.createTransaction(
+                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
+                    "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
+                    0, 0, "FAILED", "Invalid recipient: " + recipient);
             return;
         }
-        // Show recipient name and current wallet balance
-        CustomerDAO recipientDAO = new CustomerDAO();
-        Customer recLocal = recipientDAO.getCustomerByPhone(recipient);
-        String recipientNameLocal = (recLocal != null) ? recLocal.getFullName() : recipient;
-        System.out.println("Recipient: " + recipientNameLocal + " (" + recipient + ")");
-        System.out.println("Your Wallet balance: " + accountDAO.getBalance(wallet.getAccountId()) + " RWF");
+
+        boolean isOnNet = recipient.startsWith("078") || recipient.startsWith("079");
+        String recipientName;
+
+        if (isOnNet) {
+
+            Customer recipientCustomer = customerDAO.getCustomerByPhone(recipient);
+            if (recipientCustomer == null) {
+                System.out.println("✗ Recipient " + recipient +
+                        " is not registered on IgirePay.");
+                transactionDAO.createTransaction(
+                        "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
+                        "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
+                        0, 0, "FAILED", "Recipient not registered: " + recipient);
+                return;
+            }
+            recipientName = recipientCustomer.getFullName();
+            System.out.println("✓ Recipient: " + recipientName + " (" + recipient + ")");
+        } else {
+
+            recipientName = recipient;
+            System.out.println("✓ Sending to Airtel number: " + recipient);
+        }
+
+
+        System.out.println("Your Wallet balance: " +
+                accountDAO.getBalance(wallet.getAccountId()) + " RWF");
+
+
         System.out.print(Language.get("enter_amount"));
         try {
             double amount = Double.parseDouble(scanner.nextLine().trim());
             if (amount <= 0) throw new IllegalArgumentException("Amount must be greater than 0.");
-            boolean isOnNet = recipient.startsWith("078") || recipient.startsWith("079");
-            double fee = isOnNet ? FeeCalculator.getSendOnNetFee(amount) : FeeCalculator.getSendOffNetFee(amount);
-            System.out.println(Language.get("fee_info") + fee + Language.get("total_info") + (amount + fee) + " RWF (" + (isOnNet ? "On-net" : "Off-net") + ")");
+
+            double fee = isOnNet ?
+                    FeeCalculator.getSendOnNetFee(amount) :
+                    FeeCalculator.getSendOffNetFee(amount);
+            double total = amount + fee;
+
+
+            System.out.println(Language.get("fee_info") + fee +
+                    Language.get("total_info") + total + " RWF" +
+                    " (" + (isOnNet ? "On-net" : "Off-net") + ")");
+            System.out.println("Remaining balance after: " +
+                    (accountDAO.getBalance(wallet.getAccountId()) - total) + " RWF");
             System.out.print(Language.get("confirm"));
             String confirm = scanner.nextLine().trim().toLowerCase();
-            if (!confirm.equals("yes") && !confirm.equals("yego")) { System.out.println(Language.get("cancelled")); return; }
+            if (!confirm.equals("yes") && !confirm.equals("yego")) {
+                System.out.println(Language.get("cancelled"));
+                return;
+            }
+
+
             String refId = "SND-" + UUID.randomUUID();
-            if (processedRequestDAO.isAlreadyProcessed(refId)) { System.out.println("✗ Duplicate transaction."); return; }
+            if (processedRequestDAO.isAlreadyProcessed(refId)) {
+                System.out.println("✗ Duplicate transaction.");
+                return;
+            }
+
+
             wallet.sendMoneyLocal(amount, recipient);
             accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), refId, "SEND_LOCAL", amount, fee, "SUCCESS", "Sent to " + recipient);
+            transactionDAO.createTransaction(
+                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
+                    refId, "SEND_LOCAL", amount, fee, "SUCCESS",
+                    "Sent to " + recipientName + " (" + recipient + ")"
+            );
             processedRequestDAO.saveProcessedRequest(refId);
+
         } catch (Exception e) {
             System.out.println("✗ " + e.getMessage());
-            transactionDAO.createTransaction("TXN-" + UUID.randomUUID(), wallet.getAccountId(), "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL", 0, 0, "FAILED", e.getMessage());
+            transactionDAO.createTransaction(
+                    "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
+                    "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
+                    0, 0, "FAILED", e.getMessage()
+            );
         }
     }
 
@@ -399,7 +459,7 @@ public class Main {
         System.out.println("✓ Sending to: " + FeeCalculator.getCountryName(countryCode));
         System.out.print(Language.get("recipient_number"));
         String recipient = scanner.nextLine().trim();
-        // Show recipient name (if exists) and current wallet balance
+
         CustomerDAO recipientDAO = new CustomerDAO();
         Customer recIntl = recipientDAO.getCustomerByPhone(recipient);
         String recipientNameIntl = (recIntl != null) ? recIntl.getFullName() : recipient;

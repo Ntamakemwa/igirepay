@@ -36,6 +36,7 @@ import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
+import javafx.scene.control.ButtonType;
 
 public class DashboardController {
 
@@ -188,33 +189,52 @@ public class DashboardController {
             showError("✗ Incorrect PIN.");
             return;
         }
+
         TextInputDialog recipientDialog = new TextInputDialog();
         recipientDialog.setTitle("Send Money");
         recipientDialog.setHeaderText("Local Transfer");
-        recipientDialog.setContentText("Recipient phone (078/079XXXXXXX):");
+        recipientDialog.setContentText("Recipient phone (078/079 for MTN, 072/073 for Airtel):");
         Optional<String> recipientResult = recipientDialog.showAndWait();
         if (recipientResult.isEmpty()) return;
         String recipient = recipientResult.get().trim();
+
+
         if (!Customer.isValidPhoneNumber(recipient)) {
-            showError("✗ Invalid recipient number.");
+            showError("✗ Invalid number. Must be 078/079 (MTN) or 072/073 (Airtel).");
             return;
         }
-        // Validate recipient exists in database
-        CustomerDAO recipientDAO = new CustomerDAO();
-        if (!recipientDAO.customerExists(recipient)) {
-            showError("✗ Recipient account not found in system.");
-            return;
+
+        boolean isOnNet = recipient.startsWith("078") || recipient.startsWith("079");
+        boolean isAirtel = recipient.startsWith("072") || recipient.startsWith("073");
+
+        String recipientName;
+
+        if (isOnNet) {
+
+            CustomerDAO recipientDAO = new CustomerDAO();
+            Customer recInfo = recipientDAO.getCustomerByPhone(recipient);
+            if (recInfo == null) {
+                showError("✗ Recipient " + recipient + " is not registered on IgirePay.");
+                return;
+            }
+            recipientName = recInfo.getFullName();
+        } else {
+
+            recipientName = recipient;
         }
-        // Show recipient name and current wallet balance before amount entry
-        Customer recInfo = recipientDAO.getCustomerByPhone(recipient);
-        String recipientName = (recInfo != null) ? recInfo.getFullName() : recipient;
+
+
         double currentBalance = accountDAO.getBalance(wallet.getAccountId());
-        javafx.scene.control.Alert info = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+        Alert info = new Alert(Alert.AlertType.INFORMATION);
         info.setTitle("Recipient Info");
         info.setHeaderText("Recipient and Your Balance");
-        info.setContentText("Recipient: " + recipientName + " (" + recipient + ")\n" +
-                "Your Wallet balance: " + String.format("%.0f RWF", currentBalance));
+        info.setContentText(
+                "Recipient: " + recipientName + " (" + recipient + ")\n" +
+                        "Network: " + (isOnNet ? "MTN (On-net)" : "Airtel (Off-net)") + "\n" +
+                        "Your Wallet balance: " + String.format("%.0f RWF", currentBalance)
+        );
         info.showAndWait();
+
         TextInputDialog amountDialog = new TextInputDialog();
         amountDialog.setTitle("Send Money");
         amountDialog.setHeaderText("Amount");
@@ -223,134 +243,43 @@ public class DashboardController {
         amountResult.ifPresent(amountStr -> {
             try {
                 double amount = Double.parseDouble(amountStr);
-                boolean isOnNet = recipient.startsWith("078") || recipient.startsWith("079");
                 double fee = isOnNet ?
                         FeeCalculator.getSendOnNetFee(amount) :
                         FeeCalculator.getSendOffNetFee(amount);
-                // Show confirmation with projected remaining balance
+
                 double projected = accountDAO.getBalance(wallet.getAccountId()) - (amount + fee);
-                javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
                 confirm.setTitle("Confirm Transfer");
                 confirm.setHeaderText("Please confirm transfer details");
-                confirm.setContentText("Recipient: " + recipientName + " (" + recipient + ")\n" +
-                    "Amount: " + amount + " RWF\n" +
-                    "Fee: " + fee + " RWF\n" +
-                    "Total: " + (amount + fee) + " RWF\n" +
-                    "Remaining balance after transfer: " + String.format("%.0f RWF", projected));
-                java.util.Optional<javafx.scene.control.ButtonType> conf = confirm.showAndWait();
-                if (conf.isEmpty() || conf.get() != javafx.scene.control.ButtonType.OK) return;
+                confirm.setContentText(
+                        "Recipient: " + recipientName + " (" + recipient + ")\n" +
+                                "Network: " + (isOnNet ? "MTN On-net" : "Airtel Off-net") + "\n" +
+                                "Amount: " + amount + " RWF\n" +
+                                "Fee: " + fee + " RWF\n" +
+                                "Total: " + (amount + fee) + " RWF\n" +
+                                "Remaining balance after: " + String.format("%.0f RWF", projected)
+                );
+                Optional<ButtonType> conf = confirm.showAndWait();
+                if (conf.isEmpty() || conf.get() != ButtonType.OK) return;
 
                 wallet.sendMoneyLocal(amount, recipient);
                 accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
                 String refId = "SND-" + UUID.randomUUID();
                 transactionDAO.createTransaction(
                         "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                        refId, "SEND_LOCAL", amount, fee, "SUCCESS", "Sent to " + recipient
+                        refId, "SEND_LOCAL", amount, fee, "SUCCESS",
+                        "Sent to " + recipientName + " (" + recipient + ")"
                 );
                 processedRequestDAO.saveProcessedRequest(refId);
-                showSuccess("Sent " + amount + " RWF to " + recipientName + " (" + recipient + ") fee: " + fee + " RWF");
+                showSuccess("✓ Sent " + amount + " RWF to " + recipientName +
+                        " (" + recipient + ")\nFee: " + fee + " RWF");
                 refreshDashboard();
             } catch (Exception e) {
                 showError(e.getMessage());
                 transactionDAO.createTransaction(
                         "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
                         "SND-ERR-" + UUID.randomUUID(), "SEND_LOCAL",
-                        0, 0, "FAILED", e.getMessage()
-                );
-            }
-        });
-    }
-
-    @FXML
-    public void handleInternational() {
-        String pin = PinDialogUtil.showPinDialog("PIN Verification", "Enter your PIN to send internationally");
-        if (pin == null || pin.isEmpty()) return;
-        if (!wallet.validatePin(pin)) {
-            showError("✗ Incorrect PIN.");
-            return;
-        }
-        TextInputDialog countryDialog = new TextInputDialog();
-        countryDialog.setTitle("International Transfer");
-        countryDialog.setHeaderText("Supported: 254-Kenya, 255-Tanzania, 256-Uganda, 257-Burundi, 243-DRC");
-        countryDialog.setContentText("Country code:");
-        Optional<String> countryResult = countryDialog.showAndWait();
-        if (countryResult.isEmpty()) return;
-        String countryCode = countryResult.get().trim();
-        if (!FeeCalculator.isSupportedCountry(countryCode)) {
-            showError("✗ Unsupported country code: +" + countryCode);
-            return;
-        }
-        TextInputDialog recipientDialog = new TextInputDialog();
-        recipientDialog.setTitle("International Transfer");
-        recipientDialog.setHeaderText("Sending to " + FeeCalculator.getCountryName(countryCode));
-        recipientDialog.setContentText("Recipient international number (full with country code):");
-        Optional<String> recipientResult = recipientDialog.showAndWait();
-        if (recipientResult.isEmpty()) return;
-        String recipient = recipientResult.get().trim();
-        
-        // Validate international number format
-        if (!Customer.isValidInternationalNumber(recipient)) {
-            showError("✗ Invalid international number format. Use +country code format.");
-            return;
-        }
-        
-        // Show recipient (if present) and current wallet balance before amount entry
-        CustomerDAO recipientDAO = new CustomerDAO();
-        Customer recInfo = recipientDAO.getCustomerByPhone(recipient);
-        String recipientName = (recInfo != null) ? recInfo.getFullName() : recipient;
-        double currentBalance = accountDAO.getBalance(wallet.getAccountId());
-        javafx.scene.control.Alert info = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
-        info.setTitle("Recipient Info");
-        info.setHeaderText("Recipient and Your Balance");
-        info.setContentText("Recipient: " + recipientName + " (" + recipient + ")\n" +
-                "Your Wallet balance: " + String.format("%.0f RWF", currentBalance));
-        info.showAndWait();
-
-        TextInputDialog amountDialog = new TextInputDialog();
-        amountDialog.setTitle("International Transfer");
-        amountDialog.setContentText("Amount (RWF):");
-        Optional<String> amountResult = amountDialog.showAndWait();
-        amountResult.ifPresent(amountStr -> {
-            try {
-                double amount = Double.parseDouble(amountStr);
-                double fee = FeeCalculator.getInternationalFee(amount);
-                // Confirmation with projected balance
-                double projected = accountDAO.getBalance(wallet.getAccountId()) - (amount + fee);
-                javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
-                confirm.setTitle("Confirm International Transfer");
-                confirm.setHeaderText("Please confirm transfer details");
-                confirm.setContentText("Recipient: " + recipientName + " (" + recipient + ")\n" +
-                        "Country: " + FeeCalculator.getCountryName(countryCode) + "\n" +
-                        "Amount: " + amount + " RWF\n" +
-                        "Fee: " + fee + " RWF\n" +
-                        "Total: " + (amount + fee) + " RWF\n" +
-                        "Remaining balance after transfer: " + String.format("%.0f RWF", projected));
-                java.util.Optional<javafx.scene.control.ButtonType> conf = confirm.showAndWait();
-                if (conf.isEmpty() || conf.get() != javafx.scene.control.ButtonType.OK) return;
-
-                wallet.sendMoneyInternational(amount, countryCode, recipient);
-                accountDAO.updateBalance(wallet.getAccountId(), wallet.getBalance());
-                String refId = "INT-" + UUID.randomUUID();
-                transactionDAO.createTransaction(
-                        "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                        refId, "SEND_INTL", amount, fee, "SUCCESS",
-                        "International transfer to " + recipient
-                );
-                processedRequestDAO.saveProcessedRequest(refId);
-
-                showSuccess("✓ International Transfer Sent!\n" +
-                        "Recipient: " + recipientName + " (" + recipient + ")\n" +
-                        "Country: " + FeeCalculator.getCountryName(countryCode) + "\n" +
-                        "Amount: " + amount + " RWF\n" +
-                        "Fee: " + fee + " RWF\n" +
-                        "Total: " + (amount + fee) + " RWF\n\n" +
-                        "Reference: " + refId);
-                refreshDashboard();
-            } catch (Exception e) {
-                showError(e.getMessage());
-                transactionDAO.createTransaction(
-                        "TXN-" + UUID.randomUUID(), wallet.getAccountId(),
-                        "INT-ERR-" + UUID.randomUUID(), "SEND_INTL",
                         0, 0, "FAILED", e.getMessage()
                 );
             }

@@ -1,11 +1,12 @@
 package org.example.igirepay.lab1.model;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+
 import java.util.List;
-import java.util.Map;
+import java.util.ArrayList;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 
 public class Customer {
     private String customerId;
@@ -27,7 +28,7 @@ public class Customer {
     }
 
     public static boolean isValidPhoneNumber(String phone) {
-        return phone.matches("^(078|079)\\d{7}$");
+        return phone.matches("^(078|079|072|073)\\d{7}$");
     }
 
     public static boolean isValidInternationalNumber(String phone) {
@@ -39,18 +40,22 @@ public class Customer {
     }
 
     public static boolean isLocalNumber(String phone) {
+
         return phone.matches("^(078|079)\\d{7}$");
     }
 
     public static boolean isValidPin(String pin) {
+
         return pin.matches("^\\d{5}$");
     }
 
     public boolean isDuplicateTransaction(String referenceId) {
+
         return processedReferenceIds.contains(referenceId);
     }
 
     public void markTransactionProcessed(String referenceId) {
+
         processedReferenceIds.add(referenceId);
     }
 

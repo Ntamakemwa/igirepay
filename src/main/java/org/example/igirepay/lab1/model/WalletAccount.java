@@ -40,18 +40,23 @@ public class WalletAccount extends Account {
         System.out.println("  New wallet balance: " + getBalance() + " RWF");
     }
 
-    public void sendMoneyLocal(double amount, String recipientNumber) throws InsufficientBalanceException {
+
+    public void sendMoneyLocal(double amount, String recipientNumber)
+            throws InsufficientBalanceException {
         if (amount <= 0) throw new IllegalArgumentException("Amount must be greater than 0.");
         boolean isOnNet = recipientNumber.startsWith("078") || recipientNumber.startsWith("079");
-        double fee = isOnNet ? FeeCalculator.getSendOnNetFee(amount) : FeeCalculator.getSendOffNetFee(amount);
+        double fee = isOnNet ? FeeCalculator.getSendOnNetFee(amount)
+                : FeeCalculator.getSendOffNetFee(amount);
         double total = amount + fee;
         if (total > getBalance()) {
             throw new InsufficientBalanceException(
                     "Insufficient balance. You need " + total +
-                            " RWF (amount + fee: " + fee + " RWF) but have " + getBalance() + " RWF");
+                            " RWF but have " + getBalance() + " RWF");
         }
         setBalance(getBalance() - total);
-        transactionHistory.add("SEND_LOCAL | -" + total + " RWF | To: " + recipientNumber + " | Balance: " + getBalance() + " RWF");
+        transactionHistory.add("SEND_LOCAL | -" + total +
+                " RWF | To: " + recipientNumber +
+                " | Balance: " + getBalance() + " RWF");
         System.out.println("✓ Money sent successfully!");
         System.out.println("  Recipient: " + recipientNumber);
         System.out.println("  Amount: " + amount + " RWF");
@@ -59,6 +64,7 @@ public class WalletAccount extends Account {
         System.out.println("  Total deducted: " + total + " RWF");
         System.out.println("  New balance: " + getBalance() + " RWF");
     }
+
 
     public void sendMoneyInternational(double amount, String countryCode, String recipientNumber)
             throws InsufficientBalanceException {
